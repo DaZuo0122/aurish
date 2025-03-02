@@ -70,6 +70,10 @@ impl OllamaReq {
         self.prompt = prompt.to_string();
     }
 
+    pub fn set_model(&mut self, model: &str) {
+        self.model = model.to_string();
+    }
+
 }
 
 fn which_shell() -> String {
@@ -101,7 +105,7 @@ fn which_shell() -> String {
                     panic!("Shell Not supported")
                 }
             },
-            Err(e) => panic!("Shell Not found!"),
+            Err(_e) => panic!("Shell Not found!"),
         }
     }
 }

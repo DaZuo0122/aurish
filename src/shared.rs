@@ -13,12 +13,15 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph},
 };
 use std::{error::Error, io};
+use std::any::TypeId;
 use ratatui::text::Line;
 use tui_input::backend::crossterm::EventHandler;
 use serde::{Serialize, Deserialize};
 use std::env::current_dir;
 use std::path::PathBuf;
 use std::collections::VecDeque;
+use tokio::runtime::Handle;
+use crate::backend::{Bclient, OllamaReq};
 
 pub enum EditMode {
     Input,  // In this mode, user interact with input box
@@ -27,9 +30,11 @@ pub enum EditMode {
 }
 
 pub struct App {
+    /// Current value of input box
     input: Input,
     input_mode: EditMode,
-    messages: Vec<String>,
+    messages: OllamaReq,
+    /// Shell commands from LLM
     shell_commands: VecDeque<String>,
     shell: DummyShell,
 }
@@ -37,6 +42,7 @@ pub struct App {
 pub struct DummyShell {
     curr_path: PathBuf,
     shell: IShell,
+    /// command shown, to be edited or executed
     pub pending_command: String,
 }
 
@@ -52,7 +58,7 @@ impl Default for App {
         App {
             input: Input::default(),
             input_mode: EditMode::Normal,
-            messages: Vec::new(),
+            messages: OllamaReq::new("llama3:latest"),
             shell_commands: VecDeque::new(),
             shell: DummyShell::default(),
         }
@@ -84,8 +90,8 @@ impl DummyShell {
         self.curr_path = current_dir().unwrap();
     }
 
+    /// Showing current path like actual Shell did
     pub fn get_path(&self) -> String {
-        /// Showing current path like actual Shell did
         let path = self.curr_path.to_string_lossy().into_owned();
         path
     }
@@ -125,6 +131,48 @@ impl Config {
 }
 
 impl App {
+    pub async fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>, client: Bclient) -> io::Result<()> {
+        loop {
+            terminal.draw(|f| self.ui(f))?;
+
+            if let Event::Key(key) = event::read()? {
+                match self.input_mode {
+                    EditMode::Normal => match key.code {
+                        KeyCode::Char('q') => {
+                            return Ok(())
+                        },
+                        KeyCode::Char('a') => {
+                            self.input_mode = EditMode::Input;
+                        },
+                        KeyCode::Char('s') => {
+                            self.input_mode = EditMode::Shell;
+                        },
+                        _ => {}
+                    },
+                    EditMode::Input => match key.code {
+                        KeyCode::Enter => {
+                            self.messages.prompt(&self.input.value());
+                            self.recv_from(client.send_ollama(&self.messages).await.unwrap());
+                            self.input.reset()
+                        },
+                        KeyCode::Esc => {
+                            self.input_mode = EditMode::Normal;
+                        },
+                        _ => {
+                            self.input.handle_event(&Event::Key(key));
+                        }
+                    },
+                    EditMode::Shell => match key.code {
+                        KeyCode::Enter => {
+
+                        },
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
     fn ui(&mut self, frame: &mut Frame) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -213,8 +261,8 @@ impl App {
         }
     }
 
+    /// Return a List for render and length of command
     fn get_lo_msg(&mut self) -> (List, usize) {
-        /// Return a List for render and length of command
         let command = self.shell_commands.pop_front().unwrap();
         self.shell.pending_command = command.clone();
         self.shell.renew_path();
@@ -226,5 +274,10 @@ impl App {
             .highlight_symbol(">>")
             .repeat_highlight_symbol(true);
         (msg_list, command.len())
+    }
+
+    /// Store received commands
+    pub fn recv_from(&mut self, rece_vec: Vec<String>) {
+        self.shell_commands = VecDeque::from(rece_vec);
     }
 }
