@@ -20,7 +20,8 @@ use serde::{Serialize, Deserialize};
 use std::env::current_dir;
 use std::path::PathBuf;
 use std::collections::VecDeque;
-use tokio::runtime::Handle;
+use std::fmt::format;
+// use tokio::runtime::Handle;
 use crate::backend::{Bclient, OllamaReq};
 
 pub enum EditMode {
@@ -43,7 +44,9 @@ pub struct DummyShell {
     curr_path: PathBuf,
     shell: IShell,
     /// command shown, to be edited or executed
-    pub pending_command: String,
+    // pub pending_command: String,
+    sh_input: Input,
+    sh_output: String
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -70,7 +73,9 @@ impl Default for DummyShell {
         DummyShell {
             curr_path: current_dir().unwrap(),
             shell: IShell::new(),
-            pending_command: String::new(),
+            // pending_command: String::new(),
+            sh_input: Input::default(),
+            sh_output: String::new(),
         }
     }
 }
@@ -164,9 +169,17 @@ impl App {
                     },
                     EditMode::Shell => match key.code {
                         KeyCode::Enter => {
-
+                            let comm = self.shell.sh_input.value();
+                            let out_msg = self.shell.shell.run_command(comm);
+                            self.shell.sh_output = String::from_utf8(out_msg.stdout).unwrap();
+                            self.shell.sh_input.reset();
                         },
-                        _ => {}
+                        KeyCode::Esc => {
+                            self.input_mode = EditMode::Normal;
+                        }
+                        _ => {
+                            self.shell.sh_input.handle_event(&Event::Key(key));
+                        }
                     }
                 }
             }
@@ -235,8 +248,30 @@ impl App {
             .scroll((0, scroll as u16))
             .block(Block::default().borders(Borders::ALL).title("Asking AI"));
         frame.render_widget(input, chunks[1]);
-        let (msg, comm_len) = self.get_lo_msg();
-        frame.render_widget(msg, chunks[2]);
+
+        let command = self.shell_commands.pop_front().unwrap();
+        let path = self.shell.get_path();
+        let sh_comm = format!("{} > {}", path, self.shell.sh_input.clone().with_value(command.clone()));
+        let sh_para = Paragraph::new(sh_comm)
+            .style(match self.input_mode {
+                EditMode::Normal => Style::default(),
+                EditMode::Input => Style::default().fg(Color::Blue),
+                EditMode::Shell => Style::default().fg(Color::Yellow),
+            })
+            .scroll((0, scroll as u16))
+            .block(Block::default().borders(Borders::ALL).title("Shell"));
+        frame.render_widget(sh_para, chunks[2]);
+
+        let sh_msg = format!("Command: {}, Output: {}", command.clone(), self.shell.sh_output);
+        let sh_output = Paragraph::new(sh_msg)
+            .style(match self.input_mode {
+                EditMode::Normal => Style::default(),
+                _ => Style::default().fg(Color::White),
+            })
+            .block(Block::default().borders(Borders::ALL).title("Output"));
+        frame.render_widget(sh_output, chunks[3]);
+
+        // frame.render_widget(msg, chunks[2]);
         // let lower_msg = List::new(self.shell.pending_command);
         match self.input_mode {
             EditMode::Normal => {},
@@ -250,30 +285,14 @@ impl App {
                 ))
             },
             EditMode::Shell => {
-                let start_pos = self.shell.get_path().len();
                 frame.set_cursor_position((
                     chunks[2].x
-                        + (self.input.visual_cursor().max(scroll + start_pos + comm_len) - scroll - start_pos) as u16
+                        + (self.shell.sh_input.visual_cursor().max(scroll) - scroll) as u16
                         + 1,
                     chunks[2].y + 1
-                ));
+                ))
             }
         }
-    }
-
-    /// Return a List for render and length of command
-    fn get_lo_msg(&mut self) -> (List, usize) {
-        let command = self.shell_commands.pop_front().unwrap();
-        self.shell.pending_command = command.clone();
-        self.shell.renew_path();
-        let mut path = self.shell.get_path();
-        let msg = path.push_str(&self.shell.pending_command);
-        let msg_list = List::new([path])
-            .block(Block::default().borders(Borders::ALL).title("Shell"))
-            .highlight_style(Style::new())
-            .highlight_symbol(">>")
-            .repeat_highlight_symbol(true);
-        (msg_list, command.len())
     }
 
     /// Store received commands

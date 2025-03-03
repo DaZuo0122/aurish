@@ -135,14 +135,14 @@ impl Bclient {
     }
 
     pub async fn send_ollama(&self, data: &OllamaReq) -> Result<Vec<String>> {
-        println!("Request body: {:#?}", &data);
+        // println!("Request body: {:#?}", &data);
         let res = self.client.post(&self.target)
             .json(data)
             .send()
             .await.unwrap();
-        println!("Raw response: {:#?}", &res);
+        // println!("Raw response: {:#?}", &res);
         let res_body = res.text().await.unwrap();
-        println!("Response body: {:#?}", &res_body);
+        // println!("Response body: {:#?}", &res_body);
         let ollama_res: OllamaRes = serde_json::from_str(&res_body).unwrap();
         let inner_json: Command = serde_json::from_str(&ollama_res.response).unwrap();
         Ok(inner_json.commands)
