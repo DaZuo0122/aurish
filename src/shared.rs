@@ -11,6 +11,7 @@ use ratatui::{
         },
     },
     widgets::{Block, Borders, List, ListItem, Paragraph},
+    DefaultTerminal, Frame,
 };
 use std::{error::Error, io};
 use std::any::TypeId;
@@ -136,7 +137,18 @@ impl Config {
 }
 
 impl App {
-    pub async fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>, client: Bclient) -> io::Result<()> {
+
+    pub fn new(model: &str) -> App {
+        App {
+            input: Input::default(),
+            input_mode: EditMode::Normal,
+            messages: OllamaReq::new(model),
+            shell_commands: VecDeque::new(),
+            shell: DummyShell::default(),
+        }
+    }
+
+    pub async fn run(&mut self, terminal: &mut DefaultTerminal, client: Bclient) -> io::Result<()> {
         loop {
             terminal.draw(|f| self.ui(f))?;
 
@@ -192,6 +204,7 @@ impl App {
             .margin(2)
             .constraints(
                 [
+                    Constraint::Length(1),
                     Constraint::Length(1),
                     Constraint::Length(3),
                     Constraint::Min(1),
@@ -249,7 +262,9 @@ impl App {
             .block(Block::default().borders(Borders::ALL).title("Asking AI"));
         frame.render_widget(input, chunks[1]);
 
-        let command = self.shell_commands.pop_front().unwrap();
+        let command: String = if self.shell_commands.is_empty() {
+            "".to_string()
+        } else { self.shell_commands.pop_front().unwrap() };
         let path = self.shell.get_path();
         let sh_comm = format!("{} > {}", path, self.shell.sh_input.clone().with_value(command.clone()));
         let sh_para = Paragraph::new(sh_comm)
