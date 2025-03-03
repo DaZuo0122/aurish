@@ -16,7 +16,11 @@ async fn main() {
         "show",
         "dry-run",
     ]);
-    let help_msg: String = String::from("Dummy help message");
+    let help_msg: String = format!("usage: aurish-cli [--flags] value \n
+or aurish-cli [commands] \n
+example: aurish-cli --set-model llama3:8b \n
+aurish-cli dry-run \n
+available commands and flags: {:?}", &commands);
     let args: Vec<String> = env::args().collect();
     let mut iter = args.into_iter().skip(1);
     let mut config = get_config().unwrap();
@@ -27,36 +31,44 @@ async fn main() {
                 if !commands.contains(&value.as_str()) {
                     config.set_proxy(value);
                     write_to(config).unwrap();
-                } else { panic!("{}", help_msg) }
-            } else { panic!("{}", help_msg) }
+                } else { println!("{}", &help_msg); }
+            } else { println!("{}", &help_msg); }
         },
         "--set-ollama-api" => {
             if let Some(value) = iter.next() {
                 if !commands.contains(&value.as_str()) {
                     config.set_ollama_api(value);
                     write_to(config).unwrap();
-                } else { panic!("{}", help_msg) }
-            } else { panic!("{}", help_msg) }
+                } else { println!("{}", &help_msg); }
+            } else { println!("{}", &help_msg); }
         },
         "--set-model" => {
             if let Some(value) = iter.next() {
                 if !commands.contains(&value.as_str()) {
                     config.set_model(value);
                     write_to(config).unwrap();
-                } else { panic!("{}", help_msg) }
-            } else { panic!("{}", help_msg) }
+                } else {
+                    println!("{}", &help_msg);
+                }
+            } else {
+                println!("{}", &help_msg);
+            }
         },
         "show" => {
             if let Some(_value) = iter.next() {
-                panic!("{}", help_msg);
-            } else { println!("{:?}", config) }
+                println!("{}", &help_msg);
+            } else {
+                println!("{:?}", config);
+            }
         },
         "dry-run" => {
             if let Some(_value) = iter.next() {
-                panic!("{}", help_msg);
+                println!("{}", &help_msg);
             } else { dry_run(config).await; }
         }
-        _ => { panic!("{}", help_msg) }
+        _ => {
+            println!("{}", &help_msg);
+        }
     }
 }
 
