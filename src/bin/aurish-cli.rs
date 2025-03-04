@@ -97,7 +97,7 @@ pub fn write_to(config: Config) -> Result<(), Box<dyn std::error::Error>> {
 pub async fn dry_run(config: Config) {
     let mut req = OllamaReq::new(&config.get_model());
     println!("Data to send: {:#?}", &req);
-    req.prompt("How to change current path to D://foo/bar? And then create a folder named test under current path.");
+    req.prompt("How to show all files within current path? And then create a folder named test under current path.");
     if config.uses_proxy() {
         let client = Bclient::new_with_proxy(&config.get_ollama_api(), &config.get_proxy());
         let res = client.send_ollama(&req).await.unwrap();
