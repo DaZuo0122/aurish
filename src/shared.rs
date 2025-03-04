@@ -169,8 +169,10 @@ impl App {
                     EditMode::Input => match key.code {
                         KeyCode::Enter => {
                             self.messages.prompt(&self.input.value());
-                            self.recv_from(client.send_ollama(&self.messages).await.unwrap());
-                            self.input.reset()
+                            let res = client.send_ollama(&self.messages).await.unwrap();
+                            self.recv_from(res);
+                            self.input.reset();
+                            self.input_mode = EditMode::Normal;  // return to normal mode to avoid sends empty msg
                         },
                         KeyCode::Esc => {
                             self.input_mode = EditMode::Normal;
@@ -201,11 +203,10 @@ impl App {
     fn ui(&mut self, frame: &mut Frame) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .margin(2)
             .constraints(
                 [
                     Constraint::Length(1),
-                    Constraint::Length(1),
+                    Constraint::Length(3),
                     Constraint::Length(3),
                     Constraint::Min(1),
                 ].as_ref(),
@@ -250,7 +251,7 @@ impl App {
         let help_msg = Paragraph::new(text);
         frame.render_widget(help_msg, chunks[0]);
 
-        let width = chunks[0].width.max(3) - 3;  // 2 for boarders and 1 for cursor
+        let width = chunks[0].width.max(3) - 1;  // 2 for boarders and 1 for cursor
         let scroll = self.input.visual_scroll(width as usize);
         let input = Paragraph::new(self.input.value())
             .style(match self.input_mode {
