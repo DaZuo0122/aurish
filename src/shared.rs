@@ -263,12 +263,18 @@ impl App {
             .block(Block::default().borders(Borders::ALL).title("Asking AI"));
         frame.render_widget(input, chunks[1]);
 
-        let command: String = if self.shell_commands.is_empty() {
+        /* let command: String = if self.shell_commands.is_empty() {
             "".to_string()
-        } else { self.shell_commands.pop_front().unwrap() };
+        } else { self.shell_commands.pop_front().unwrap() }; */
         let path = self.shell.get_path();
-        let sh_comm = format!("{} > {}", path, self.shell.sh_input.clone().with_value(command.clone()));
-        let sh_para = Paragraph::new(sh_comm)
+        let sh_to_render = if self.shell_commands.is_empty() {
+            format!("{} > {}", path, self.shell.sh_input.value())
+        } else {
+            let command = self.shell_commands.pop_front().unwrap();
+            format!("{} > {}", path, self.shell.sh_input.clone().with_value(command))
+        };
+        // let sh_comm = format!("{} > {}", path, self.shell.sh_input.clone().with_value(command.clone()));
+        let sh_para = Paragraph::new(sh_to_render.clone())
             .style(match self.input_mode {
                 EditMode::Normal => Style::default(),
                 EditMode::Input => Style::default().fg(Color::Blue),
@@ -278,7 +284,7 @@ impl App {
             .block(Block::default().borders(Borders::ALL).title("Shell"));
         frame.render_widget(sh_para, chunks[2]);
 
-        let sh_msg = format!("Command: {}, Output: {}", command.clone(), self.shell.sh_output);
+        let sh_msg = format!("Command: {}, Output: {}", self.shell.sh_input.value(), self.shell.sh_output);
         let sh_output = Paragraph::new(sh_msg)
             .style(match self.input_mode {
                 EditMode::Normal => Style::default(),
@@ -301,9 +307,10 @@ impl App {
                 ))
             },
             EditMode::Shell => {
+                // let comm_len = self.shell.sh_input.value().len();
                 frame.set_cursor_position((
                     chunks[2].x
-                        + (self.shell.sh_input.visual_cursor().max(scroll) - scroll) as u16
+                        + (self.shell.sh_input.visual_cursor().max(scroll + sh_to_render.len()) - scroll) as u16
                         + 1,
                     chunks[2].y + 1
                 ))
