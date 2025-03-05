@@ -15,14 +15,14 @@ use ratatui::{
 };
 use std::{error::Error, io};
 use std::any::TypeId;
+use std::cell::RefCell;
+use std::rc::Rc;
 use ratatui::text::Line;
 use tui_input::backend::crossterm::EventHandler;
 use serde::{Serialize, Deserialize};
 use std::env::current_dir;
 use std::path::PathBuf;
 use std::collections::VecDeque;
-use std::fmt::format;
-// use tokio::runtime::Handle;
 use crate::backend::{Bclient, OllamaReq};
 
 pub enum EditMode {
@@ -46,8 +46,9 @@ pub struct DummyShell {
     shell: IShell,
     /// command shown, to be edited or executed
     // pub pending_command: String,
-    sh_input: Input,
-    sh_output: String
+    sh_input: Rc<RefCell<Input>>,
+    sh_output: String,
+    executed: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -75,8 +76,9 @@ impl Default for DummyShell {
             curr_path: current_dir().unwrap(),
             shell: IShell::new(),
             // pending_command: String::new(),
-            sh_input: Input::default(),
+            sh_input: Rc::new(RefCell::new(Input::default())),
             sh_output: String::new(),
+            executed: false,
         }
     }
 }
@@ -101,6 +103,12 @@ impl DummyShell {
         let path = self.curr_path.to_string_lossy().into_owned();
         path
     }
+
+    fn input_reset(&self) {
+        self.sh_input.borrow_mut().reset();
+    }
+
+    
 }
 
 impl Config {
@@ -183,16 +191,21 @@ impl App {
                     },
                     EditMode::Shell => match key.code {
                         KeyCode::Enter => {
-                            let comm = self.shell.sh_input.value();
+                            let mut input_ref = self.shell.sh_input.borrow_mut();
+                            let comm = input_ref.value();
                             let out_msg = self.shell.shell.run_command(comm);
                             self.shell.sh_output = String::from_utf8(out_msg.stdout).unwrap();
-                            self.shell.sh_input.reset();
+                            drop(input_ref);
+                            self.shell.input_reset();
+                            let _ = if self.shell_commands.is_empty() { None }
+                                else { Some(self.shell_commands.pop_front().unwrap()) };
                         },
                         KeyCode::Esc => {
                             self.input_mode = EditMode::Normal;
                         }
                         _ => {
-                            self.shell.sh_input.handle_event(&Event::Key(key));
+                            let mut input_ref = self.shell.sh_input.borrow_mut();
+                            input_ref.handle_event(&Event::Key(key));
                         }
                     }
                 }
@@ -267,11 +280,20 @@ impl App {
             "".to_string()
         } else { self.shell_commands.pop_front().unwrap() }; */
         let path = self.shell.get_path();
+		// TODO
+		// render bug happens here, command will be comsumed after render the first time
+		// AI suggest peek first value instead of pop, and pop it after execute
+		// But user might want to modify the command, need to write a new logic
+		// Add bool value indicated state(whether renew the Input) in Dummy shell may help
         let sh_to_render = if self.shell_commands.is_empty() {
-            format!("{} > {}", path, self.shell.sh_input.value())
+            let input_ref = self.shell.sh_input.borrow_mut();
+            format!("{} > {}", path, input_ref.value())
         } else {
-            let command = self.shell_commands.pop_front().unwrap();
-            format!("{} > {}", path, self.shell.sh_input.clone().with_value(command))
+            let command = self.shell_commands.front().unwrap().clone();
+            let mut input_ref = self.shell.sh_input.borrow_mut();
+            *input_ref = input_ref.clone().with_value(command);
+            drop(input_ref);
+            format!("{} > {}", path, self.shell.sh_input.borrow().value())
         };
         // let sh_comm = format!("{} > {}", path, self.shell.sh_input.clone().with_value(command.clone()));
         let sh_para = Paragraph::new(sh_to_render.clone())
@@ -284,7 +306,9 @@ impl App {
             .block(Block::default().borders(Borders::ALL).title("Shell"));
         frame.render_widget(sh_para, chunks[2]);
 
-        let sh_msg = format!("Command: {}, Output: {}", self.shell.sh_input.value(), self.shell.sh_output);
+        let binding = self.shell.sh_input.clone();
+        let val_ref = binding.borrow();
+        let sh_msg = format!("Command: {}, Output: {}", val_ref.value(), self.shell.sh_output);
         let sh_output = Paragraph::new(sh_msg)
             .style(match self.input_mode {
                 EditMode::Normal => Style::default(),
@@ -307,13 +331,12 @@ impl App {
                 ))
             },
             EditMode::Shell => {
-                // let comm_len = self.shell.sh_input.value().len();
                 frame.set_cursor_position((
                     chunks[2].x
-                        + (self.shell.sh_input.visual_cursor().max(scroll + sh_to_render.len()) - scroll) as u16
+                        + (val_ref.visual_cursor().max(scroll + sh_to_render.len()) - scroll) as u16
                         + 1,
                     chunks[2].y + 1
-                ))
+                ));
             }
         }
     }
