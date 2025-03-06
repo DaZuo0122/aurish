@@ -44,8 +44,7 @@ pub struct App {
 pub struct DummyShell {
     curr_path: PathBuf,
     shell: IShell,
-    /// command shown, to be edited or executed
-    // pub pending_command: String,
+    executed_command: String,
     sh_input: Rc<RefCell<Input>>,
     sh_output: String,
     executed: bool,
@@ -75,7 +74,7 @@ impl Default for DummyShell {
         DummyShell {
             curr_path: current_dir().unwrap(),
             shell: IShell::new(),
-            // pending_command: String::new(),
+            executed_command: String::new(),
             sh_input: Rc::new(RefCell::new(Input::default())),
             sh_output: String::new(),
             executed: false,
@@ -193,12 +192,19 @@ impl App {
                         KeyCode::Enter => {
                             let mut input_ref = self.shell.sh_input.borrow_mut();
                             let comm = input_ref.value();
+                            self.shell.executed_command = comm.to_string();
                             let out_msg = self.shell.shell.run_command(comm);
-                            self.shell.sh_output = String::from_utf8(out_msg.stdout).unwrap();
+                            self.shell.sh_output = match out_msg.code {
+                                Some(0) => { String::from_utf8(out_msg.stdout).unwrap() },
+                                None => { "This command has no output".to_string() },
+                                _ => { String::from_utf8(out_msg.stderr).unwrap() },
+                            };
+                            // println!("current output: {}", &self.shell.sh_output);
                             drop(input_ref);
                             self.shell.input_reset();
                             let _ = if self.shell_commands.is_empty() { None }
                                 else { Some(self.shell_commands.pop_front().unwrap()) };
+                            // self.input_mode = EditMode::Normal;
                         },
                         KeyCode::Esc => {
                             self.input_mode = EditMode::Normal;
@@ -264,6 +270,7 @@ impl App {
         let help_msg = Paragraph::new(text);
         frame.render_widget(help_msg, chunks[0]);
 
+        /// Asking AI block
         let width = chunks[0].width.max(3) - 1;  // 2 for boarders and 1 for cursor
         let scroll = self.input.visual_scroll(width as usize);
         let input = Paragraph::new(self.input.value())
@@ -276,15 +283,9 @@ impl App {
             .block(Block::default().borders(Borders::ALL).title("Asking AI"));
         frame.render_widget(input, chunks[1]);
 
-        /* let command: String = if self.shell_commands.is_empty() {
-            "".to_string()
-        } else { self.shell_commands.pop_front().unwrap() }; */
+
+        /// Shell interact block
         let path = self.shell.get_path();
-		// TODO
-		// render bug happens here, command will be comsumed after render the first time
-		// AI suggest peek first value instead of pop, and pop it after execute
-		// But user might want to modify the command, need to write a new logic
-		// Add bool value indicated state(whether renew the Input) in Dummy shell may help
         let sh_to_render = if self.shell_commands.is_empty() {
             let input_ref = self.shell.sh_input.borrow_mut();
             format!("{} > {}", path, input_ref.value())
@@ -295,7 +296,6 @@ impl App {
             drop(input_ref);
             format!("{} > {}", path, self.shell.sh_input.borrow().value())
         };
-        // let sh_comm = format!("{} > {}", path, self.shell.sh_input.clone().with_value(command.clone()));
         let sh_para = Paragraph::new(sh_to_render.clone())
             .style(match self.input_mode {
                 EditMode::Normal => Style::default(),
@@ -306,9 +306,10 @@ impl App {
             .block(Block::default().borders(Borders::ALL).title("Shell"));
         frame.render_widget(sh_para, chunks[2]);
 
+        /// Shell output block
         let binding = self.shell.sh_input.clone();
         let val_ref = binding.borrow();
-        let sh_msg = format!("Command: {}, Output: {}", val_ref.value(), self.shell.sh_output);
+        let sh_msg = format!("Command: {}, Output: {}", self.shell.executed_command, self.shell.sh_output);
         let sh_output = Paragraph::new(sh_msg)
             .style(match self.input_mode {
                 EditMode::Normal => Style::default(),
@@ -317,8 +318,6 @@ impl App {
             .block(Block::default().borders(Borders::ALL).title("Output"));
         frame.render_widget(sh_output, chunks[3]);
 
-        // frame.render_widget(msg, chunks[2]);
-        // let lower_msg = List::new(self.shell.pending_command);
         match self.input_mode {
             EditMode::Normal => {},
             // Hide cursor in normal mode
