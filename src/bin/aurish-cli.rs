@@ -13,6 +13,7 @@ async fn main() {
         "--set-proxy",
         "--set-ollama-api",
         "--set-model",
+        "-h",
         "show",
         "dry-run",
     ]);
@@ -20,6 +21,7 @@ async fn main() {
 or aurish-cli [commands] \n
 example: aurish-cli --set-model llama3:8b \n
 aurish-cli dry-run \n
+aurish-cli -h \n
 available commands and flags: {:?}", &commands);
     let args: Vec<String> = env::args().collect();
     let mut iter = args.into_iter().skip(1);
@@ -54,6 +56,7 @@ available commands and flags: {:?}", &commands);
                 println!("{}", &help_msg);
             }
         },
+        "-h" => { println!("{:?}", &help_msg)}
         "show" => {
             if let Some(_value) = iter.next() {
                 println!("{}", &help_msg);
