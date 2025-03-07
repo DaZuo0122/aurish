@@ -45,6 +45,7 @@ pub struct DummyShell {
     curr_path: PathBuf,
     shell: IShell,
     executed_command: String,
+    current_command: String,
     sh_input: Rc<RefCell<Input>>,
     sh_output: String,
     executed: bool,
@@ -75,6 +76,7 @@ impl Default for DummyShell {
             curr_path: current_dir().unwrap(),
             shell: IShell::new(),
             executed_command: String::new(),
+            current_command: String::new(),
             sh_input: Rc::new(RefCell::new(Input::default())),
             sh_output: String::new(),
             executed: false,
@@ -179,6 +181,10 @@ impl App {
                             let res = client.send_ollama(&self.messages).await.unwrap();
                             self.recv_from(res);
                             self.input.reset();
+                            let mut input_ref = self.shell.sh_input.borrow_mut();
+                            let comm = self.shell_commands.front().unwrap().clone();
+                            *input_ref = input_ref.clone().with_value(comm);
+                            drop(input_ref);
                             self.input_mode = EditMode::Normal;  // return to normal mode to avoid sends empty msg
                         },
                         KeyCode::Esc => {
@@ -200,11 +206,16 @@ impl App {
                                 _ => { String::from_utf8(out_msg.stderr).unwrap() },
                             };
                             // println!("current output: {}", &self.shell.sh_output);
-                            drop(input_ref);
-                            self.shell.input_reset();
                             let _ = if self.shell_commands.is_empty() { None }
                                 else { Some(self.shell_commands.pop_front().unwrap()) };
-                            // self.input_mode = EditMode::Normal;
+                            if self.shell_commands.is_empty() {
+                                drop(input_ref);
+                                self.shell.input_reset();  // borrow mut here
+                            } else {
+                                let command = self.shell_commands.front().unwrap().clone();
+                                *input_ref = input_ref.clone().with_value(command);
+                            }
+                            self.input_mode = EditMode::Normal;
                         },
                         KeyCode::Esc => {
                             self.input_mode = EditMode::Normal;
@@ -227,7 +238,7 @@ impl App {
                     Constraint::Length(1),
                     Constraint::Length(3),
                     Constraint::Length(3),
-                    Constraint::Min(1),
+                    Constraint::Length(24),
                 ].as_ref(),
             )
             .split(frame.area());
@@ -286,6 +297,7 @@ impl App {
 
         /// Shell interact block
         let path = self.shell.get_path();
+        /*
         let sh_to_render = if self.shell_commands.is_empty() {
             let input_ref = self.shell.sh_input.borrow_mut();
             format!("{} > {}", path, input_ref.value())
@@ -296,6 +308,10 @@ impl App {
             drop(input_ref);
             format!("{} > {}", path, self.shell.sh_input.borrow().value())
         };
+        */
+        let input_ref_val = self.shell.sh_input.borrow();
+        let sh_to_render = format!("{} > {}", path, input_ref_val.value());
+        drop(input_ref_val);
         let sh_para = Paragraph::new(sh_to_render.clone())
             .style(match self.input_mode {
                 EditMode::Normal => Style::default(),
