@@ -5,7 +5,7 @@ An AI integrated Shell, where you can review and modify AI given commands and th
 > For privacy and safety concerns, Aurish only supports OLLAMA models for now.
 
 > [!CAUTION]
-> This project is under active development, and may encounter unexpected bugs.
+> This project is under active development, and may encounter unexpected bugs when using.
 
 ## Known issues
  - Shell output cannot be displayed correctly.
