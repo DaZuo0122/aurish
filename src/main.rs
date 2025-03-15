@@ -1,4 +1,4 @@
-use aurish::{shared::{App, Config}, backend::{OllamaReq, Bclient}};
+use aurish::{shared::{App, Config}, backend::{OllamaReq, Bclient, ClientInit}};
 use tokio;
 use std::{fs, io};
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
@@ -23,10 +23,10 @@ async fn main() -> io::Result<()> {
     } else { Bclient::new(config.get_ollama_api()) };
     let res = app.run(&mut terminal, client);
 
-    disable_raw_mode()?;
+    // disable_raw_mode()?;
     ratatui::restore();
 
-    res.await
+    res.await  // Is the futures here ended program unexpectedly?
 }
 
 fn get_config() -> Result<Config, Box<dyn std::error::Error>> {

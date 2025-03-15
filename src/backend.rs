@@ -1,4 +1,5 @@
 use reqwest::{Client, Proxy};
+use reqwest::blocking::Client as BlockingClinet;
 use serde::{Deserialize, Serialize, Deserializer};
 use serde_json::{Result, Value, json};
 use std::error::Error;
@@ -41,6 +42,11 @@ pub struct Command {
 
 pub struct Bclient {
     client: Client,
+    target: String,
+}
+
+pub struct BKclient {
+    client: BlockingClinet,
     target: String,
 }
 
@@ -110,6 +116,11 @@ fn which_shell() -> String {
     }
 }
 
+pub trait ClientInit {
+    fn new(target: &str) -> Self;
+    fn new_with_proxy(target: &str, proxy: &str) -> Self;
+}
+
 impl Default for Bclient {
     fn default() -> Self {
         Bclient {
@@ -119,21 +130,50 @@ impl Default for Bclient {
     }
 }
 
-impl Bclient {
-    pub fn new(target: &str) -> Bclient {
+impl Default for BKclient {
+    fn default() -> Self {
+        BKclient {
+            client: BlockingClinet::new(),
+            target: "http://localhost:11434/api/generate".to_string(),
+        }
+    }
+}
+
+impl ClientInit for Bclient {
+    fn new(target: &str) -> Self {
         Bclient {
             client: Client::new(),
             target: target.to_string(),
         }
     }
-    pub fn new_with_proxy(target: &str, proxy: &str) -> Bclient {
+
+    fn new_with_proxy(target: &str, proxy: &str) -> Self {
         Bclient {
             client: Client::builder()
                 .proxy(Proxy::http(proxy).unwrap()).build().unwrap(),
             target: target.to_string(),
         }
     }
+}
 
+impl ClientInit for BKclient {
+    fn new(target: &str) -> Self {
+        BKclient {
+            client: BlockingClinet::new(),
+            target: target.to_string(),
+        }
+    }
+
+    fn new_with_proxy(target: &str, proxy: &str) -> Self {
+        BKclient {
+            client: BlockingClinet::builder()
+                .proxy(Proxy::http(proxy).unwrap()).build().unwrap(),
+            target: target.to_string(),
+        }
+    }
+}
+
+impl Bclient {
     pub async fn send_ollama(&self, data: &OllamaReq) -> Result<Vec<String>> {
         // println!("Request body: {:#?}", &data);
         let res = self.client.post(&self.target)
@@ -144,7 +184,21 @@ impl Bclient {
         let res_body = res.text().await.unwrap();
         // println!("Response body: {:#?}", &res_body);
         let ollama_res: OllamaRes = serde_json::from_str(&res_body).unwrap();
+        // println!("Ollama response: {:#?}", &ollama_res);
         let inner_json: Command = serde_json::from_str(&ollama_res.response).unwrap();
         Ok(inner_json.commands)
+    }
+}
+
+impl BKclient {
+    pub fn send_ollama(&self, data: &OllamaReq) -> Result<Vec<String>> {
+        let res = self.client.post(&self.target)
+            .json(data)
+            .send()
+            .unwrap();
+        let res_body = res.text().unwrap();
+        let ollama_res: OllamaRes = serde_json::from_str(&res_body).unwrap();
+        let inner__json: Command = serde_json::from_str(&ollama_res.response).unwrap();
+        Ok(inner__json.commands)
     }
 }

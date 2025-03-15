@@ -4,11 +4,11 @@ use std::io::Write;
 use std::env;
 use std::path::Path;
 use aurish::shared::Config;
-use aurish::backend::{Bclient, OllamaReq};
-use tokio;
+use aurish::backend::{BKclient, OllamaReq, ClientInit};
 
-#[tokio::main]
-async fn main() {
+
+
+fn main() {
     let commands: Vec<&str> = Vec::from([
         "--set-proxy",
         "--set-ollama-api",
@@ -67,7 +67,7 @@ available commands and flags: {:?}", &commands);
         "dry-run" => {
             if let Some(_value) = iter.next() {
                 println!("{}", &help_msg);
-            } else { dry_run(config).await; }
+            } else { dry_run(config); }
         }
         _ => {
             println!("{}", &help_msg);
@@ -97,17 +97,17 @@ pub fn write_to(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub async fn dry_run(config: Config) {
+pub fn dry_run(config: Config) {
     let mut req = OllamaReq::new(&config.get_model());
     println!("Data to send: {:#?}", &req);
     req.prompt("How to show all files within current path? And then create a folder named test under current path.");
     if config.uses_proxy() {
-        let client = Bclient::new_with_proxy(&config.get_ollama_api(), &config.get_proxy());
-        let res = client.send_ollama(&req).await.unwrap();
+        let client = BKclient::new_with_proxy(&config.get_ollama_api(), &config.get_proxy());
+        let res = client.send_ollama(&req).unwrap();
         println!("ollama response: {:?}", res)
     } else {
-        let client = Bclient::new(&config.get_ollama_api());
-        let res = client.send_ollama(&req).await.unwrap();
+        let client = BKclient::new(&config.get_ollama_api());
+        let res = client.send_ollama(&req).unwrap();
         println!("ollama response: {:?}", res)
     }
 }
