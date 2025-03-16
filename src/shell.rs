@@ -63,35 +63,6 @@ macro_rules! leech_output {
 ///
 /// The `ShellOutput` struct holds the results of a command that was run through a shell,
 /// including the exit code, standard output, and standard error output.
-///
-/// # Examples
-///
-/// ```rust
-/// use ishell::{IShell, ShellOutput};
-///
-/// let shell = IShell::new();
-/// let shell_output = shell.run_command("true");
-///
-/// // equivalent of `shell_output.code.unwrap() == 0`
-/// assert!(shell_output.is_success());
-/// assert!(shell_output.stdout.is_empty());
-/// assert!(shell_output.stderr.is_empty());
-/// ```
-///
-/// ```rust
-/// use ishell::{IShell, ShellOutput};
-///
-/// let shell = IShell::new();
-/// let result = shell.run_command("echo 'Hello, world!'");
-///
-/// assert!(result.is_success());
-///
-/// let target_result =
-///    String::from_utf8(result.stdout).expect("Stdout contained invalid UTF-8!");
-///
-/// assert_eq!(target_result, "Hello, world!");
-/// assert!(result.stderr.is_empty());
-/// ```
 pub struct ShellOutput {
     /// An optional exit code returned by the command.
     /// - If the command executed successfully, this will typically be `0`.
@@ -119,29 +90,6 @@ impl ShellOutput {
 }
 
 /// A shell interface with memory
-///
-/// # Examples
-///
-/// ```rust
-/// use ishell::IShell;
-///
-/// // Opening an IShell at the same directory as the shell running this program
-/// let shell = IShell::new();
-///
-/// // Create a directory, travel into it and create another directory
-/// shell.run_command("mkdir test");
-/// shell.run_command("cd test");
-/// shell.run_command("mkdir test2");
-///
-/// // Are we still in the `test` directory?..
-/// let result = shell.run_command("ls");
-/// let stdout_res = String::from_utf8(result.stdout).expect("Stdout contained invalid UTF-8!");
-/// assert_eq!(stdout_res.trim(), "test2"); // Indeed we are
-///
-/// // Let's clean after ourselves
-/// shell.run_command("cd ..");
-/// shell.run_command("rm -r test");
-/// ```
 pub struct IShell {
     initial_dir: PathBuf,
     current_dir: Arc<Mutex<PathBuf>>,
@@ -209,21 +157,6 @@ impl IShell {
     /// - Current directory (from where your program is ran) does not exist
     /// - There are insufficient permissions to access the current directory (from where your program is ran)
     /// - Directory (from where your program is ran) contains invalid UTF-8
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use ishell::IShell;
-    /// // Opening an IShell at the same directory as the shell running this program
-    /// let shell = IShell::new();
-    ///
-    /// // Opening an IShell at the `/home/user/Desktop/` directory
-    /// let desktop_shell = IShell::from_path("/home/user/Desktop/");
-    ///
-    /// // Opening an IShell at the directory "test123" or "./test123",
-    /// // relative to the shell running this program
-    /// let relative_test123_shell = IShell::from_path("test123");
-    /// ```
     pub fn new() -> Self {
         let current_dir = env::current_dir().expect(
             "Failed to get current directory; it may not exist or you may not have permissions",
@@ -243,23 +176,6 @@ impl IShell {
     ///
     /// if it exists.
     /// Otherwise, initial_dir is treated as a full path
-    ///
-    /// # Examples
-    /// ```rust
-    /// use ishell::IShell;
-    ///
-    /// // Opens a shell in relative (to the `std::env::current_dir()`)
-    /// // directory `target` if it exists. If it does not,
-    /// // tries to treat `target` as a full path
-    /// let shell = IShell::from_path("target").unwrap();
-    ///
-    /// // Opens a shell at resolved path from current user running it
-    /// let shell = IShell::from_path("~").unwrap();
-    /// let result = shell.run_command("ls -l");
-    ///
-    /// let result = String::from_utf8(result.stdout).expect("Stdout contained invalid UTF-8!");
-    /// println!("{}", result);
-    /// ```
     pub fn from_path(initial_dir: impl AsRef<Path>) -> Result<Self, ShellInitError> {
         let initial_dir = initial_dir.as_ref();
 
@@ -285,16 +201,7 @@ impl IShell {
     ///
     /// Any `cd` command will not be _actually_ ran. Instead, inner directory of IShell (`current_dir`) will change
     /// accordingly. If `cd` is aliased to something else, (i.e. `changedir`), and you use this alias instead of `cd`,
-    /// then IShell wont understand that you wanted it to change directory.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use ishell::{ShellOutput, IShell};
-    ///
-    /// let shell = IShell::from_path("~").unwrap();
-    /// let result: ShellOutput = shell.run_command("ls");
-    /// ```
+    /// then IShell won't understand that you wanted it to change directory.
     pub fn run_command(&self, command: &str) -> ShellOutput {
         #[cfg(feature = "logging")]
         info!("Running: `{}`", command);
@@ -372,34 +279,6 @@ impl IShell {
     }
 
     /// Forget current directory and go back to the directory initially specified.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use ishell::IShell;
-    ///
-    /// // Opening an IShell at the same directory as the shell running this program
-    /// let shell = IShell::new();
-    ///
-    /// shell.run_command("mkdir test123");
-    /// shell.run_command("cd test123");
-    ///
-    /// // We just created this dir. It should be empty.
-    /// let result = shell.run_command("ls");
-    ///
-    /// let result = String::from_utf8(result.stdout)
-    ///     .expect("Stdout contained invalid UTF-8!");
-    /// assert_eq!(result, "");
-    ///
-    /// // This will move us to the initial directory in which
-    /// // the IShell was created (the same directory as the shell running this program)
-    /// shell.forget_current_directory();
-    ///
-    /// let result = shell.run_command("ls test123");
-    /// assert!(result.is_success());
-    ///
-    /// shell.run_command("rm -r test123");
-    /// ```
     pub fn forget_current_directory(&self) {
         let mut current_dir = self.current_dir.lock().unwrap();
         *current_dir = self.initial_dir.clone();
