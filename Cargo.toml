@@ -16,8 +16,12 @@ tui-input = "0.11.1"
 crossterm = "0.28.1"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
-ishell = "0.3.1"
 reqwest = { version = "0.12.12", features = ["json", "blocking"] }
 tokio = { version = "1.43.0", features = ["full"]}
 clap = { version = "4.5.32", features = ["derive"]}
 rustyline = "15.0.0"
+dirs = "6.0.0"
+log = { version = "0.4.25", optional = true }
+
+[dev-dependencies]
+rand = "0.8.5"
