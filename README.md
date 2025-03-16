@@ -4,17 +4,17 @@ An AI integrated Shell, where you can review and modify AI given commands and th
 > [!NOTE]
 > For privacy and safety concerns, Aurish only supports OLLAMA models for now.
 
-> [!CAUTION]
-> This project is under active development, and may encounter unexpected bugs when using.
-
-## Known issues
- - Shell output cannot be displayed correctly.
-
+## Overview
+This project has two binaries, `aurish` and `aurish-cli`. `aurish` is a asynchronous TUI program which contains an AI chatbox and an interactive shell box where AI suggested commands will wait for your action. You can also use the shell box as a real shell, on windows the default shell is `PowerShell`. While `aurish-cli` is a lightweight synchronous CLI program which focusing on simple interaction with AI and suggested commands. Although it doesn't support entering shell commands yourself, you can still review and modify AI given commands before executing. 
 
 ## How to use
+> [!CAUTION]
+> AI suggested commands might do harm to your device, always review before executing!
+> Use it at your own risk.
 0. Make sure `Ollama` server is running  
 
-1. Use `aurish-cli` to set the configuration, including model name, Ollama api endpoint and proxy.  
+1. Use `aurish-cli` to set the configuration, including **model name**, **Ollama api endpoint** and **proxy**.  
+You can type `aurish-cli --help` to see all available flags and commands.  
 The default setting is
 ```json
 {
@@ -50,7 +50,8 @@ ollama response: ["dir", "md test"]
 ```
 
 
-4. Once everything set, type `aurish` to run
+4. Once everything set, type `aurish` to use  
+   If you want to use `aurish-cli`, type `aurish-cli run`. You can quit `aurish-cli` with `CTRL-C` anytime you want. 
 
 
 ## Install
