@@ -12,11 +12,11 @@ use aurish::frontend::App_cli;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Set proxy (e.g., --set-proxy http://proxy.example.com)
+    /// Set proxy (e.g., --set-proxy http://proxy.example.com:port)
     #[arg(long = "set-proxy")]
     set_proxy: Option<String>,
 
-    /// Set ollama API (e.g., --set-ollama-api http://ollama.api)
+    /// Set ollama API (e.g., --set-ollama-api "http://localhost:11434/api/generate")
     #[arg(long = "set-ollama-api")]
     set_ollama_api: Option<String>,
 
