@@ -1,3 +1,3 @@
-mod frontend;
+pub mod frontend;
 pub mod backend;
 pub mod shared;

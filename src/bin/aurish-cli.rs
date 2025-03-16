@@ -1,78 +1,87 @@
+use clap::{Subcommand, Parser, CommandFactory};
 use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::env;
 use std::path::Path;
+use serde::de::Error;
 use aurish::shared::Config;
 use aurish::backend::{BKclient, OllamaReq, ClientInit};
+use aurish::frontend::App_cli;
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Set proxy (e.g., --set-proxy http://proxy.example.com)
+    #[arg(long = "set-proxy")]
+    set_proxy: Option<String>,
 
+    /// Set ollama API (e.g., --set-ollama-api http://ollama.api)
+    #[arg(long = "set-ollama-api")]
+    set_ollama_api: Option<String>,
 
-fn main() {
-    let commands: Vec<&str> = Vec::from([
-        "--set-proxy",
-        "--set-ollama-api",
-        "--set-model",
-        "-h",
-        "show",
-        "dry-run",
-    ]);
-    let help_msg: String = format!("usage: aurish-cli [--flags] value \n
-or aurish-cli [commands] \n
-example: aurish-cli --set-model llama3:8b \n
-aurish-cli dry-run \n
-aurish-cli -h \n
-available commands and flags: {:?}", &commands);
-    let args: Vec<String> = env::args().collect();
-    let mut iter = args.into_iter().skip(1);
+    /// Set model (e.g., --set-model llama3:8b)
+    #[arg(long = "set-model")]
+    set_model: Option<String>,
+
+    /// Subcommand to execute: show or dry-run or run
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Show current configuration
+    Show,
+    /// Execute a dry run of the configuration
+    // #[command(alias = "dry-run")]
+    DryRun,
+    /// Execute aurish-cli interactive version (lightweight compare to aurish)
+    // #[command(alias = "run")]
+    Run,
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>>{
+    let args = Args::parse();
     let mut config = get_config().unwrap();
-    let arg = iter.next().unwrap();
-    match arg.as_str() {
-        "--set-proxy" => {
-            if let Some(value) = iter.next() {
-                if !commands.contains(&value.as_str()) {
-                    config.set_proxy(value);
-                    write_to(config).unwrap();
-                } else { println!("{}", &help_msg); }
-            } else { println!("{}", &help_msg); }
-        },
-        "--set-ollama-api" => {
-            if let Some(value) = iter.next() {
-                if !commands.contains(&value.as_str()) {
-                    config.set_ollama_api(value);
-                    write_to(config).unwrap();
-                } else { println!("{}", &help_msg); }
-            } else { println!("{}", &help_msg); }
-        },
-        "--set-model" => {
-            if let Some(value) = iter.next() {
-                if !commands.contains(&value.as_str()) {
-                    config.set_model(value);
-                    write_to(config).unwrap();
-                } else {
-                    println!("{}", &help_msg);
-                }
-            } else {
-                println!("{}", &help_msg);
-            }
-        },
-        "-h" => { println!("{:?}", &help_msg)}
-        "show" => {
-            if let Some(_value) = iter.next() {
-                println!("{}", &help_msg);
-            } else {
-                println!("{:?}", config);
-            }
-        },
-        "dry-run" => {
-            if let Some(_value) = iter.next() {
-                println!("{}", &help_msg);
-            } else { dry_run(config); }
-        }
-        _ => {
-            println!("{}", &help_msg);
-        }
+
+    if let Some(proxy) = args.set_proxy {
+        config.set_proxy(proxy);
+        write_to(config).unwrap();
+        return Ok(());
     }
+    if let Some(api) = args.set_ollama_api {
+        config.set_ollama_api(api);
+        write_to(config).unwrap();
+        return Ok(());
+    }
+    if let Some(model) = args.set_model {
+        config.set_model(model);
+        write_to(config).unwrap();
+        return Ok(());
+    }
+
+    if let Some(cmd) = args.command {
+        match cmd {
+            Commands::Show => {
+                println!("Config: {:?}", config);
+                return Ok(())
+            },
+            Commands::DryRun => {
+                dry_run(config);
+                return Ok(())
+            },
+            Commands::Run => {
+                run_app_cli(config).unwrap();
+                return Ok(())
+            }
+        }
+    } else {
+        Args::command().print_help().unwrap();
+        println!();
+    }
+
+    Ok(())
 }
 
 pub fn get_config() -> Result<Config, Box<dyn std::error::Error>> {
@@ -109,6 +118,18 @@ pub fn dry_run(config: Config) {
         let client = BKclient::new(&config.get_ollama_api());
         let res = client.send_ollama(&req).unwrap();
         println!("ollama response: {:?}", res)
+    }
+}
+
+pub fn run_app_cli(config: Config) -> Result<(), rustyline::error::ReadlineError> {
+    if config.uses_proxy() {
+        let client = BKclient::new_with_proxy(&config.get_ollama_api(), &config.get_proxy());
+        let mut app = App_cli::new(&config.get_model());
+        app.run(client)
+    } else {
+        let client = BKclient::new(&config.get_ollama_api());
+        let mut app = App_cli::new(&config.get_model());
+        app.run(client)
     }
 }
 
