@@ -1,6 +1,5 @@
 use tui_input::Input;
 use ratatui::prelude::*;
-use ishell::IShell;
 use ratatui::{
     crossterm::{
         event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
@@ -24,6 +23,7 @@ use std::env::current_dir;
 use std::path::PathBuf;
 use std::collections::VecDeque;
 use crate::backend::{Bclient, OllamaReq};
+use crate::shell::IShell;
 
 pub enum EditMode {
     Input,  // In this mode, user interact with input box
