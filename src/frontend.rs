@@ -1,11 +1,12 @@
 use std::env::current_dir;
 use rustyline::{DefaultEditor, Result};
 use rustyline::error::ReadlineError;
-use ishell::IShell;
+// use ishell::IShell;
 use std::path::PathBuf;
 use std::collections::VecDeque;
 use crate::shared::EditMode;
 use crate::backend::{OllamaReq, ClientInit, BKclient};
+use crate::shell::IShell;
 
 
 pub struct App_cli {
@@ -63,6 +64,7 @@ impl App_cli {
                     match readline {
                         Ok(line) => {
                             self.message.prompt(line.as_str());
+                            println!("Generating...");
                             let res = client.send_ollama(&self.message).unwrap();
                             self.recv_from(res);
                             self.edit_mode = EditMode::Shell;
@@ -95,7 +97,11 @@ impl App_cli {
                             Ok(line) => {
                                 // execute on-screen command
                                 let sh_result = self.shell.shell.run_command(line.as_str());
-                                let result = String::from_utf8(sh_result.stdout).expect("Stdout contained invalid UTF-8!");
+                                let result: String = if sh_result.is_success() {
+                                    String::from_utf8(sh_result.stdout).expect("Stdout contained invalid UTF-8!")
+                                } else {
+                                    String::from_utf8(sh_result.stderr).expect("Stdout contained invalid UTF-8!")
+                                };
                                 println!("Shell output: {}", result);
                                 // delete executed command
                                 let _ = self.shell_commands.pop_front();
