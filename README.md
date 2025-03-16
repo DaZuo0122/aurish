@@ -6,6 +6,10 @@ An AI integrated Shell, where you can review and modify AI given commands and th
 
 ## Overview
 This project has two binaries, `aurish` and `aurish-cli`. `aurish` is a asynchronous TUI program which contains an AI chatbox and an interactive shell box where AI suggested commands will wait for your action. You can also use the shell box as a real shell, on windows the default shell is `PowerShell`. While `aurish-cli` is a lightweight synchronous CLI program which focusing on simple interaction with AI and suggested commands. Although it doesn't support entering shell commands yourself, you can still review and modify AI given commands before executing. 
+### aurish
+![aurish overview](./aurish-overview.png)
+### aurish-cli
+![aurish-cli overview](./aurish-cli-overview.png)
 
 ## How to use
 > [!CAUTION]
